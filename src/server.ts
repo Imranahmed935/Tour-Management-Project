@@ -2,14 +2,12 @@ import { Server } from "http";
 import mongoose from "mongoose";
 import app from "./app";
 import { envVars } from "./app/config/env";
-// import { promise } from "zod";
-// import { error } from "console";
+
 
 let server: Server;
 
 const runServer = async () => {
   try {
-    console.log(envVars.NODE_ENV);
     await mongoose.connect(envVars.DB_URL);
     console.log("Database Connected successfully!");
 
