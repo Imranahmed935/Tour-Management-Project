@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { NextFunction, Request, Response } from "express";
 import { catchAsync } from "../../utils/catchAsync";
@@ -9,19 +10,37 @@ import { JwtPayload } from "jsonwebtoken";
 import { createUserTokens } from "../../utils/userTokens";
 import AppError from "../../errorHelpers/AppError";
 import { envVars } from "../../config/env";
+import passport from "passport";
 
 const credentialsLogin = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
-    const loginInfo = await AuthServices.credentialsLogin(req.body);
+    // const loginInfo = await AuthServices.credentialsLogin(req.body);
+    passport.authenticate("local", async (err: any, user: any, info: any) => {
+      if (err) {
+        return next(new AppError(401, err));
+      }
 
-    setAuthCookie(res, loginInfo);
+      if (!user) {
+        return next(new AppError(401, info.message));
+      }
 
-    sendResponse(res, {
-      success: true,
-      statusCode: httpStatus.OK,
-      message: "user loggedIn successfully",
-      data: loginInfo,
-    });
+      const userTokens = await createUserTokens(user);
+
+      setAuthCookie(res, userTokens);
+
+      const { password: pass, ...rest } = user.toObject();
+
+      sendResponse(res, {
+        success: true,
+        statusCode: httpStatus.OK,
+        message: "user loggedIn successfully",
+        data: {
+          accessToken: userTokens.accessToken,
+          refreshToken: userTokens.refreshToken,
+          data:rest
+        },
+      });
+    })(req, res, next);
   }
 );
 
@@ -83,7 +102,6 @@ const resetPassword = catchAsync(
 );
 const googleCallbackController = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
-
     let redirect = req.query.state ? (req.query.state as string) : "/";
 
     if (!redirect.startsWith("/")) {
