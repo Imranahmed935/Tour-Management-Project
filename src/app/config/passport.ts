@@ -6,7 +6,7 @@ import {
 } from "passport-google-oauth20";
 import { envVars } from "./env";
 import { User } from "../modules/user/user.model";
-import { Role } from "../modules/user/user.interface";
+import { IsActive, Role } from "../modules/user/user.interface";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import bcryptjs from "bcryptjs";
@@ -20,9 +20,27 @@ passport.use(
     async (email: string, password: string, done) => {
       try {
         const isUserExist = await User.findOne({ email });
+        // if (!isUserExist) {
+        //   return done(null, false, { message: "User does not exist" });
+        // }
+
         if (!isUserExist) {
-          return done(null, false, { message: "User does not exist" });
-        }
+                return done("User does not exist")
+            }
+
+            if (!isUserExist.isVerified) {
+                // throw new AppError(httpStatus.BAD_REQUEST, "User is not verified")
+                return done("User is not verified")
+            }
+
+            if (isUserExist.isActive === IsActive.BLOCKED || isUserExist.isActive === IsActive.INACTIVE) {
+                // throw new AppError(httpStatus.BAD_REQUEST, `User is ${isUserExist.isActive}`)
+                return done(`User is ${isUserExist.isActive}`)
+            }
+            if (isUserExist.isDeleted) {
+                // throw new AppError(httpStatus.BAD_REQUEST, "User is deleted")
+                return done("User is deleted")
+            }
 
         const isGoogleAuthenticated = isUserExist.auths.some(
           (googleAuthenticated) => googleAuthenticated.provider == "google"
@@ -73,6 +91,23 @@ passport.use(
           done(null, false, { message: "No email found!" });
         }
         let user = await User.findOne({ email });
+
+        // let isUserExist = await User.findOne({ email })
+                if (user && !user.isVerified) {
+                    // throw new AppError(httpStatus.BAD_REQUEST, "User is not verified")
+                    // done("User is not verified")
+                    return done(null, false, { message: "User is not verified" })
+                }
+
+                if (user && (user.isActive === IsActive.BLOCKED || user.isActive === IsActive.INACTIVE)) {
+                    // throw new AppError(httpStatus.BAD_REQUEST, `User is ${isUserExist.isActive}`)
+                    done(`User is ${user.isActive}`)
+                }
+
+                if (user && user.isDeleted) {
+                    return done(null, false, { message: "User is deleted" })
+                    // done("User is deleted")
+                }
 
         if (!user) {
           user = await User.create({
